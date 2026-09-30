@@ -34,7 +34,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 // Compressing these poisons later work: `edit` matches oldString against text the
-// model read verbatim, and `write` echoes content it may re-quote.
+// model read verbatim, and `write` echoes content it may re-quote. Search output is
+// eligible because its source links and claims can be retained in a shorter result.
 const NEVER_COMPRESS = new Set(["read", "edit", "write"]);
 
 // The provider must let Pi own the message array. Under `cursor` the SDK fingerprints
@@ -174,7 +175,7 @@ export function collectSteps(entries: ProjectedSessionEntry[]): Step[] {
 	return steps;
 }
 
-function compressibleTools(step: Step): StepTool[] {
+export function compressibleTools(step: Step): StepTool[] {
 	// Errors stay verbatim: short, load-bearing, and often re-quoted.
 	return step.tools.filter(
 		(tool) => !NEVER_COMPRESS.has(tool.toolName) && !tool.isError && tool.text.length > 0,
@@ -297,6 +298,7 @@ Meanwhile, keep the compressed text useful such that you are able to continue th
 - Replace the text to remove to "..." and a short takeaway, e.g. "... (same as the content below)".
 - You should keep the original structure unchanged, e.g., XML tags, Python indentation and line numbers.
 - Again, keep useful details in the original content unchanged, e.g., XML tags, Python indentation and line numbers.
+- For a web_search result, retain each source URL, title, and the claim it supports. Do not turn attributed facts into unattributed summaries.
 
 Typical examples:
 - If the step opens a huge file but only one part is necessary for future steps, replace other parts to "... (unrelated function XXX, YYY)".

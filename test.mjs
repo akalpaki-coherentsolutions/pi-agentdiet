@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { collectSteps, supersededReads, parseCompressed } from "./index.ts";
+import { collectSteps, compressibleTools, supersededReads, parseCompressed } from "./index.ts";
 
 let pass = 0;
 const check = (name, fn) => { fn(); pass++; console.log("  ok  " + name); };
@@ -37,12 +37,14 @@ assistant("a3", [call("tc4", "read", { path: "./spec.md" })]);   // full re-read
 toolResult("r3", "tc4", "read", "Z".repeat(4000));
 assistant("a4", [call("tc5", "grep", { q: "x" })]);
 toolResult("r4", "tc5", "grep", "hit", true);                     // isError
+assistant("a5", [call("tc6", "web_search", { query: "MUI v9 docs" })]);
+toolResult("r5", "tc6", "web_search", "Source: https://mui.com/\nTitle: MUI documentation\n".repeat(200));
 const steps = collectSteps(entries);
 
 console.log("collectSteps");
-check("one step per assistant message", () => assert.equal(steps.length, 5));
+check("one step per assistant message", () => assert.equal(steps.length, 6));
 check("tool results attach to their assistant", () => {
-  assert.deepEqual(steps.map((s) => s.tools.length), [1, 1, 1, 1, 1]);
+  assert.deepEqual(steps.map((s) => s.tools.length), [1, 1, 1, 1, 1, 1]);
   assert.equal(steps[0].assistantEntryId, "a0");
   assert.equal(steps[0].tools[0].entryId, "r0");
 });
@@ -50,8 +52,11 @@ check("a user message closes the open step", () => {
   const extra = [...entries, { sourceEntry: { id: "u2", type: "message", message: { role: "user", content: [] } }, messages: [] },
                              { sourceEntry: { id: "rX", type: "message", message: { role: "toolResult", toolCallId: "z", toolName: "bash", isError: false, content: [] } }, messages: [] }];
   const s2 = collectSteps(extra);
-  assert.equal(s2.length, 5, "orphan toolResult after a user message must not join step 4");
-  assert.equal(s2[4].tools.length, 1);
+  assert.equal(s2.length, 6, "orphan toolResult after a user message must not join step 5");
+  assert.equal(s2[5].tools.length, 1);
+});
+check("web search results are eligible for reflection", () => {
+  assert.deepEqual(compressibleTools(steps[5]).map((tool) => tool.toolName), ["web_search"]);
 });
 check("step index does not reset across user prompts", () => {
   const two = [];
